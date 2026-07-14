@@ -1,0 +1,27 @@
+{
+  "name": "code-to-pdf",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yoonseoyc/Code-to-PDF.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/yoonseoyc/Code-to-PDF/issues"
+  },
+  "homepage": "https://github.com/yoonseoyc/Code-to-PDF#readme",
+  "dependencies": {
+    "puppeteer": "^25.3.0"
+  },
+  "allowScripts": {
+    "puppeteer@25.3.0": true
+  }
+}

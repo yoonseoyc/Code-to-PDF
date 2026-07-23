@@ -19,6 +19,7 @@
   },
   "homepage": "https://github.com/yoonseoyc/Code-to-PDF#readme",
   "dependencies": {
+    "highlight.js": "^11.11.1",
     "puppeteer": "^25.3.0"
   },
   "allowScripts": {

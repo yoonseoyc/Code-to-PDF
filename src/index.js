@@ -1,13 +1,39 @@
 import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
+import hljs from 'highlight.js';
 import {buildBody} from './template.js';
+
+function fontAsBase64(fontFilePath) {
+    const fontPath = fs.readFileSync(path.resolve(import.meta.dirname, '../fonts', fontFilePath));
+    return fontPath.toString('base64');
+}
+const FIRA_CODE_LOCAL = fontAsBase64('Fira_Code/FiraCode-VariableFont_wght.ttf');
+const INCLUSIVE_SANS_LOCAL = fontAsBase64('Inclusive_Sans/InclusiveSans-VariableFont_wght.ttf');
+const FONT_FACES = `@font-face {
+    font-family: 'Fira Code LOCAL';
+    src: url(data:font/ttf;base64,${FIRA_CODE_LOCAL}) format('truetype');
+}
+@font-face {
+    font-family: 'Inclusive Sans LOCAL';
+    src: url(data:font/ttf;base64,${INCLUSIVE_SANS_LOCAL}) format('truetype');
+}`;
+
+const cssStyle = fs.readFileSync('./src/styles.css', 'utf-8');
+const hljsStyle = fs.readFileSync(path.resolve(import.meta.dirname, '../node_modules/highlight.js/styles/github.min.css'), 'utf-8');
+const LANGUAGE_MAP = {
+    cpp: 'cpp'
+}
 
 async function createPDF(inputFilePath) {
     const fileName = path.basename(inputFilePath);
     const code = fs.readFileSync(inputFilePath, 'utf-8');
+    
+    const fileExt = path.extname(inputFilePath).slice(1);
+    const language = LANGUAGE_MAP[fileExt] || 'plaintext';
+    const highlightedCode = hljs.highlight(code, {language}).value;
 
-    const bodyTemplate = buildBody(fileName, code);
+    const bodyTemplate = buildBody(fileName, highlightedCode, cssStyle, hljsStyle, FONT_FACES);
 
     const browser = await puppeteer.launch();
     const page = await browser.newPage();

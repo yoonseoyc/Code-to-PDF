@@ -1,0 +1,21 @@
+body {
+    margin: 0;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #d3d3d3;
+}
+
+.file-title {
+    font-family: 'Inclusive Sans LOCAL';
+    font-weight: bold;
+    font-size: 0.875rem;
+}
+
+pre {
+    font-family: 'Fira Code LOCAL';
+    font-weight: 450;
+    line-height: 1.625em;
+    font-size: 0.75rem;
+}

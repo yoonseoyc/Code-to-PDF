@@ -1,4 +1,7 @@
-function buildBody(fileName, highlightedCode, cssStyle, hljsStyle, fontFaces) {
+function buildBody(fileName, codeHTML, cssStyle, hljsStyle, fontFaces, options, lineNumberColor) {
+    const showTitle = options.fileTitle !== false;
+    const titleOption = showTitle ? `<div class="file-title">${fileName}</div>` : '';
+
     return `<!DOCTYPE html>
 <html>
     <head>
@@ -6,13 +9,14 @@ function buildBody(fileName, highlightedCode, cssStyle, hljsStyle, fontFaces) {
             ${cssStyle}
             ${hljsStyle}
             ${fontFaces}
+            .line-number { color: ${lineNumberColor} !important; }
         </style>
     </head>
     <body>
-        <div class="file-title">${fileName}</div>
-        <hr>
-        <pre>${highlightedCode}</pre>
-        <hr>
+        ${titleOption}
+        <hr class="divider-start">
+        ${codeHTML}
+        <hr class="divider-end">
     </body>
 </html>`;
 }

@@ -2,20 +2,48 @@ body {
     margin: 0;
 }
 
+.file-title {
+    margin-bottom: 0.5rem;
+
+    font-family: 'Inclusive Sans LOCAL', 'Courier New', Courier, monospace;
+    font-weight: bold;
+    font-size: 0.875rem;
+}
+
 hr {
     border: none;
     border-top: 1px solid #d3d3d3;
 }
 
-.file-title {
-    font-family: 'Inclusive Sans LOCAL';
-    font-weight: bold;
-    font-size: 0.875rem;
+.divider-start {
+    margin: 0 0 0.75rem 0;
 }
 
-pre {
-    font-family: 'Fira Code LOCAL';
+.divider-end {
+    margin: 0.75rem 0 0 0;
+}
+
+.line-row {
+    display: flex;
+    padding: 0 0.5rem;
+
+    font-family: 'Fira Code LOCAL', 'Courier New', Courier, monospace;
     font-weight: 450;
     line-height: 1.625em;
     font-size: 0.75rem;
+}
+
+.line-number {
+    display: inline-block;
+    flex-shrink: 0;
+    width: 2rem;
+    margin-right: 1rem;
+    text-align: right;
+    color: #bbb;
+    user-select: none;
+}
+
+.line-code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }

@@ -73,6 +73,7 @@ async function createPDF(inputFilePath, options) {
         path: './output/sample.pdf',
         format: 'LETTER',
         margin: {top: '0.4in', bottom: '0.4in', left: '0.4in', right: '0.4in'},
+        printBackground: true
     });
     await browser.close();
     console.log('\n> PDF created.\n');

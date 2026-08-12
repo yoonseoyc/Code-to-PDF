@@ -2,7 +2,7 @@ import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
 import hljs from 'highlight.js';
-import {buildBody} from './template.js';
+import {buildBody, buildHeader, buildFooter} from './template.js';
 
 // Reads a font file and returns base64 for embedding in HTML/CSS.
 function fontAsBase64(fontFilePath) {
@@ -24,12 +24,9 @@ const FONT_FACES = `@font-face {
 
 const cssStyle = fs.readFileSync('./src/styles.css', 'utf-8');
 const hljsStyle = fs.readFileSync(path.resolve(import.meta.dirname, '../node_modules/highlight.js/styles/github.min.css'), 'utf-8');
-const LANGUAGE_MAP = {
-    cpp: 'cpp'
-}
 
 // Extracts the comment color from the hljs theme for line-number styling.
-function getCommentColor(fallback = "#bbb") {
+function getCommentColor(fallback = "#808080") {
     const regexRule = /([^{}]+)\{([^{}]+)\}/g;
     let match;
     while ((match = regexRule.exec(hljsStyle)) !== null) {
@@ -55,16 +52,20 @@ function buildCodeLayout(highlightedHTML, optionLineNum) {
 }
 
 async function createPDF(inputFilePath, options) {
+    const filePath = path.relative(process.cwd(), inputFilePath);
     const fileName = path.basename(inputFilePath);
     const code = fs.readFileSync(inputFilePath, 'utf-8');
     
     const fileExt = path.extname(inputFilePath).slice(1);
-    const language = LANGUAGE_MAP[fileExt] || 'plaintext';
+    const language = hljs.getLanguage(fileExt) ? fileExt : 'plaintext';
+    const languageName = language === 'plaintext' ? '' : hljs.getLanguage(language).name;
     const highlightedHTML = hljs.highlight(code, {language}).value;
     const lineNumberColor = getCommentColor();
     const codeHTML = buildCodeLayout(highlightedHTML, options.lineNumbers);
 
     const bodyTemplate = buildBody(fileName, codeHTML, cssStyle, hljsStyle, FONT_FACES, options, lineNumberColor);
+    const headerTemplate = buildHeader(filePath, fileName, languageName, FONT_FACES, options);
+    const footerTemplate = buildFooter(fileName, FONT_FACES, options);
 
     const browser = await puppeteer.launch();
     const page = await browser.newPage();
@@ -72,8 +73,11 @@ async function createPDF(inputFilePath, options) {
     await page.pdf({
         path: './output/sample.pdf',
         format: 'LETTER',
-        margin: {top: '0.4in', bottom: '0.4in', left: '0.4in', right: '0.4in'},
-        printBackground: true
+        printBackground: true,
+        displayHeaderFooter: true,
+        headerTemplate,
+        footerTemplate,
+        margin: {top: '0.5in', bottom: '0.5in', left: '0.4in', right: '0.4in'}
     });
     await browser.close();
     console.log('\n> PDF created.\n');

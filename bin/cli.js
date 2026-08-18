@@ -1,12 +1,14 @@
 import { program } from 'commander';
-import { checkbox } from '@inquirer/prompts';
+import { select, checkbox } from '@inquirer/prompts';
 import path from 'path';
 import fs from 'fs';
-import { createPDF } from '../src/index.js';
+import { createIndividualPDFs, createMergedPDF } from '../src/index.js';
 
 program
     .name('node bin/cli.js')
     .argument('<paths...>', 'File path to convert')
+    .option('--merge', 'Merge all files into a single PDF')
+    .option('--no-merge', 'Output each file as a separate PDF')
     .option('--file-title', 'Show file name')
     .option('--no-file-title', 'Hide file name')
     .option('--line-numbers', 'Show line numbers')
@@ -25,11 +27,11 @@ program
         `\nHelp:     node bin/cli.js -h\n`
     )
     .action(async(paths, options) => {
-        const inputFilePath = paths[0];
-        if (!fs.existsSync(inputFilePath)) {
+        const missingPath = paths.find((inputPath) => !fs.existsSync(inputPath));
+        if(missingPath) {
             console.error(
                 `\nERROR: File not found.` +
-                `\nPath:  ${inputFilePath}\n` +
+                `\nPath:  ${missingPath}\n` +
                 `\nHelp:  node bin/cli.js -h\n`
             );
             process.exit(1);
@@ -37,6 +39,7 @@ program
 
         // Prompts only if CLI flags weren't explicitly set.
         const needsPrompt =
+            options.merge === undefined ||
             options.fileTitle === undefined ||
             options.lineNumbers === undefined ||
             options.headerPath === undefined ||
@@ -45,6 +48,7 @@ program
             options.footerPage === undefined;
 
         let settings = {
+            merge: options.merge,
             fileTitle: options.fileTitle,
             lineNumbers: options.lineNumbers,
             headerPath: options.headerPath,
@@ -55,8 +59,18 @@ program
 
         if (needsPrompt) {
             console.log('\n(Press Ctrl + C to cancel.)\n')
+
+            const mergeChoice = await select({
+                message: 'Select PDF output method:',
+                choices: [
+                    {name: 'Merge all files into a single PDF', value: true},
+                    {name: 'Output each file as a separate PDF', value: false}
+                ],
+                default: settings.merge !== false
+            });
+
             const selected = await checkbox({
-                message: 'Select items to include',
+                message: 'Select items to include:',
                 choices: [
                     {name: 'File title', value: 'fileTitle', checked: settings.fileTitle !== false},
                     {name: 'Line numbers', value: 'lineNumbers', checked: settings.lineNumbers !== false},
@@ -68,6 +82,7 @@ program
             });
 
             settings = {
+                merge: mergeChoice,
                 fileTitle: selected.includes('fileTitle'),
                 lineNumbers: selected.includes('lineNumbers'),
                 headerPath: selected.includes('headerPath'),
@@ -75,9 +90,15 @@ program
                 footerName: selected.includes('footerName'),
                 footerPage: selected.includes('footerPage')
             };
+        } else {
+            console.log(`\n> Received ${paths.length} file(s).\n`)
         }
 
-        await createPDF(inputFilePath, settings);
+        if (settings.merge) {
+            await createMergedPDF(paths, settings);
+        } else {
+            await createIndividualPDFs(paths, settings);
+        }
     });
 
 program.parse();

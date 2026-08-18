@@ -2,7 +2,8 @@ import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
 import hljs from 'highlight.js';
-import {buildBody, buildHeader, buildFooter} from './template.js';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { buildBody, buildHeader, buildFooter } from './template.js';
 
 // Reads a font file and returns base64 for embedding in HTML/CSS.
 function fontAsBase64(fontFilePath) {
@@ -42,8 +43,7 @@ function getCommentColor(fallback = "#808080") {
 
 // Builds the HTML layout for highlighted code.
 function buildCodeLayout(highlightedHTML, optionLineNum) {
-    const lines = highlightedHTML.split('\n');
-    return lines
+    return highlightedHTML.split('\n')
         .map((line, i) => {
             const lineNum = i + 1;
             return `<div class="line-row">${optionLineNum ? `<span class="line-number">${lineNum}</span>` : ''}<span class="line-code">${line || ' '}</span></div>`;
@@ -51,14 +51,35 @@ function buildCodeLayout(highlightedHTML, optionLineNum) {
     .join('\n');
 }
 
-async function createPDF(inputFilePath, options) {
-    const filePath = path.relative(process.cwd(), inputFilePath);
-    const fileName = path.basename(inputFilePath);
-    const code = fs.readFileSync(inputFilePath, 'utf-8');
+// Draw "current / total" page number
+async function addPageNumbers(pdfDocument) {
+    const pages = pdfDocument.getPages();
+    const font = await pdfDocument.embedFont(StandardFonts.Helvetica);
+    const fontSize = 7.125;
+    const { width } = pages[0].getSize();
+
+    pages.forEach((page, index) => {
+        const pageText = `${index + 1} / ${pages.length}`;
+        const textWidth = font.widthOfTextAtSize(pageText, fontSize);
+        page.drawText(pageText, {
+            x: width - 27.72 - textWidth,
+            y: 16.52,
+            font,
+            size: fontSize,
+            color: rgb(0.5, 0.5, 0.5)
+        });
+    });
+}
+
+async function createPDF(browser, inputPath, options) {
+    const filePath = path.relative(process.cwd(), inputPath);
+    const fileName = path.basename(inputPath);
+    const code = fs.readFileSync(inputPath, 'utf-8');
     
-    const fileExt = path.extname(inputFilePath).slice(1);
+    const fileExt = path.extname(inputPath).slice(1);
     const language = hljs.getLanguage(fileExt) ? fileExt : 'plaintext';
     const languageName = language === 'plaintext' ? '' : hljs.getLanguage(language).name;
+
     const highlightedHTML = hljs.highlight(code, {language}).value;
     const lineNumberColor = getCommentColor();
     const codeHTML = buildCodeLayout(highlightedHTML, options.lineNumbers);
@@ -67,11 +88,9 @@ async function createPDF(inputFilePath, options) {
     const headerTemplate = buildHeader(filePath, fileName, languageName, FONT_FACES, options);
     const footerTemplate = buildFooter(fileName, FONT_FACES, options);
 
-    const browser = await puppeteer.launch();
     const page = await browser.newPage();
     await page.setContent(bodyTemplate, {waitUntil: 'networkidle0'});
-    await page.pdf({
-        path: './output/sample.pdf',
+    const pdfData = await page.pdf({
         format: 'LETTER',
         printBackground: true,
         displayHeaderFooter: true,
@@ -79,8 +98,54 @@ async function createPDF(inputFilePath, options) {
         footerTemplate,
         margin: {top: '0.5in', bottom: '0.5in', left: '0.4in', right: '0.4in'}
     });
-    await browser.close();
-    console.log('\n> PDF created.\n');
+    await page.close();
+    return pdfData;
 }
 
-export {createPDF};
+async function createIndividualPDFs(inputFilePaths, options) {
+    const browser = await puppeteer.launch();
+    
+    for (const inputPath of inputFilePaths) {
+        console.log(`> Converting: ${inputPath}`);
+        let pdfData = await createPDF(browser, inputPath, options);
+
+        if (options.footerPage !== false) {
+            const pdfDocument = await PDFDocument.load(pdfData);
+            await addPageNumbers(pdfDocument);
+            pdfData = await pdfDocument.save();
+        }
+        
+        const fileName = path.basename(inputPath);
+        const fileExt = path.extname(fileName);
+        const outputFileName = `${fileName.slice(0, -fileExt.length)}${fileExt.replace('.', '_')}`;
+        fs.writeFileSync(`./output/${outputFileName}.pdf`, pdfData);
+    }
+    await browser.close();
+    console.log('\n> PDF created: ./output/...\n');
+}
+
+async function createMergedPDF(inputFilePaths, options) {
+    const browser = await puppeteer.launch();
+    const mergedPDF = await PDFDocument.create();
+
+    for (const inputPath of inputFilePaths) {
+        console.log(`> Converting: ${inputPath}`);
+        const pdfData = await createPDF(browser, inputPath, options);
+        const pdfDocument = await PDFDocument.load(pdfData);
+        const pagesToAdd = await mergedPDF.copyPages(pdfDocument, pdfDocument.getPageIndices());
+        pagesToAdd.forEach((page) => {
+            mergedPDF.addPage(page)
+        });
+    }
+    await browser.close();
+
+    if (options.footerPage !== false) {
+        await addPageNumbers(mergedPDF);
+    }
+
+    const mergedPDFData = await mergedPDF.save();
+    fs.writeFileSync('./output/merged.pdf', mergedPDFData);
+    console.log('\n> PDF created: ./output/merged.pdf\n');
+}
+
+export { createIndividualPDFs, createMergedPDF };

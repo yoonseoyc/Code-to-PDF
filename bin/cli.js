@@ -1,40 +1,81 @@
+#!/usr/bin/env node
+
 import { program } from 'commander';
 import { select, checkbox } from '@inquirer/prompts';
 import path from 'path';
 import fs from 'fs';
-import { createIndividualPDFs, createMergedPDF } from '../src/index.js';
+import { createIndividualPDFs, createMergedPDF, findFiles } from '../src/index.js';
 
 program
-    .name('node bin/cli.js')
-    .argument('<paths...>', 'File path to convert')
+    .name('codepdf')
+    .description('Convert code files to a highlighted PDF')
+    .argument('<paths...>', 'File or folder paths to convert')
+    .optionsGroup('Output:')
+    .option('-o, --output <directory>', 'Output location', './codepdf')
+    .optionsGroup('Merge:')
     .option('--merge', 'Merge all files into a single PDF')
     .option('--no-merge', 'Output each file as a separate PDF')
+    .optionsGroup('Content:')
     .option('--file-title', 'Show file name')
     .option('--no-file-title', 'Hide file name')
     .option('--line-numbers', 'Show line numbers')
     .option('--no-line-numbers', 'Hide line numbers')
+    .optionsGroup('Header:')
     .option('--header-path', 'Header left: show file path')
     .option('--no-header-path', 'Header left: hide file path')
     .option('--header-lang', 'Header right: show language')
     .option('--no-header-lang', 'Header right: hide language')
+    .optionsGroup('Footer:')
     .option('--footer-name', 'Footer left: show file name')
     .option('--no-footer-name', 'Footer left: hide file name')
     .option('--footer-page', 'Footer right: show page number')
     .option('--no-footer-page', 'Footer right: hide page number')
+    .addHelpText('after',
+        `
+Examples:
+  codepdf ./example.sample.cpp
+  codepdf ./example
+  codepdf ./example -o ./output
+        `
+    )
     .showHelpAfterError(
-        `\nUsage:    node bin/cli.js <paths...>` +
-        `\nExample:  node bin/cli.js ./examples/main.cpp\n` +
-        `\nHelp:     node bin/cli.js -h\n`
+        `\nUsage: codepdf [options] <paths...>` +
+        `\nHelp:  codepdf -h\n`
     )
     .action(async(paths, options) => {
-        const missingPath = paths.find((inputPath) => !fs.existsSync(inputPath));
-        if(missingPath) {
+        const missingPaths = paths.filter((inputPath) => !fs.existsSync(inputPath));
+        if(missingPaths.length > 0) {
             console.error(
-                `\nERROR: File not found.` +
-                `\nPath:  ${missingPath}\n` +
-                `\nHelp:  node bin/cli.js -h\n`
+                `\nError: ${missingPaths.length} path(s) not found.\n` +
+                missingPaths.map((path) => ` ˙ ${path}`).join('\n') +
+                `\n\nHelp:  codepdf -h\n`
             );
             process.exit(1);
+        }
+
+        let included = [];
+        let skipped = [];
+
+        for (const p of paths) {
+            const result = findFiles(p);
+            included = included.concat(result.included);
+            skipped = skipped.concat(result.skipped);
+        }
+
+        if (included.length === 0) {
+            console.error(
+                `\nError: No files found to process.` +
+                `\nHelp:  codepdf -h\n`
+            );
+            process.exit(1);
+        }
+
+        if (skipped.length > 0) {
+            console.log(
+                `\n> Skipped:` +
+                `\n${skipped.map((path) => `  ˙ ${path}`).join('\n')}` +
+                `\n  Total: ${skipped.length} file(s)`
+            );
         }
 
         // Prompts only if CLI flags weren't explicitly set.
@@ -91,13 +132,14 @@ program
                 footerPage: selected.includes('footerPage')
             };
         } else {
-            console.log(`\n> Received ${paths.length} file(s).\n`)
+            console.log(`\n> Received ${included.length} file(s).\n`)
         }
 
+        const outputDir = path.resolve(process.cwd(), options.output);
         if (settings.merge) {
-            await createMergedPDF(paths, settings);
+            await createMergedPDF(included, outputDir, settings);
         } else {
-            await createIndividualPDFs(paths, settings);
+            await createIndividualPDFs(included, outputDir, settings);
         }
     });
 

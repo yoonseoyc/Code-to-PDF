@@ -5,6 +5,10 @@ import hljs from 'highlight.js';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { buildBody, buildHeader, buildFooter } from './template.js';
 
+/**
+ * Font
+ */
+
 // Reads a font file and returns base64 for embedding in HTML/CSS.
 function fontAsBase64(fontFilePath) {
     const fontPath = fs.readFileSync(path.resolve(import.meta.dirname, '../fonts', fontFilePath));
@@ -23,8 +27,12 @@ const FONT_FACES = `@font-face {
     src: url(data:font/ttf;base64,${INCLUSIVE_SANS_LOCAL}) format('truetype');
 }`;
 
-const cssStyle = fs.readFileSync('./src/styles.css', 'utf-8');
+const cssStyle = fs.readFileSync(path.resolve(import.meta.dirname, './styles.css'), 'utf-8');
 const hljsStyle = fs.readFileSync(path.resolve(import.meta.dirname, '../node_modules/highlight.js/styles/github.min.css'), 'utf-8');
+
+/**
+ * Code layout
+ */
 
 // Extracts the comment color from the hljs theme for line-number styling.
 function getCommentColor(fallback = "#808080") {
@@ -71,6 +79,10 @@ async function addPageNumbers(pdfDocument) {
     });
 }
 
+/**
+ * PDF generation
+ */
+
 async function createPDF(browser, inputPath, options) {
     const filePath = path.relative(process.cwd(), inputPath);
     const fileName = path.basename(inputPath);
@@ -102,11 +114,13 @@ async function createPDF(browser, inputPath, options) {
     return pdfData;
 }
 
-async function createIndividualPDFs(inputFilePaths, options) {
+async function createIndividualPDFs(inputFilePaths, outputDir, options) {
     const browser = await puppeteer.launch();
+    let fileCount = 0;
     
+    console.log(`\n> Converting:`);
     for (const inputPath of inputFilePaths) {
-        console.log(`> Converting: ${inputPath}`);
+        console.log(`  ˙ ${inputPath}`);
         let pdfData = await createPDF(browser, inputPath, options);
 
         if (options.footerPage !== false) {
@@ -114,38 +128,98 @@ async function createIndividualPDFs(inputFilePaths, options) {
             await addPageNumbers(pdfDocument);
             pdfData = await pdfDocument.save();
         }
-        
+
         const fileName = path.basename(inputPath);
         const fileExt = path.extname(fileName);
-        const outputFileName = `${fileName.slice(0, -fileExt.length)}${fileExt.replace('.', '_')}`;
-        fs.writeFileSync(`./output/${outputFileName}.pdf`, pdfData);
+        const baseName = fileExt ? fileName.slice(0, -fileExt.length) : fileName;
+        const outputPath = path.join(outputDir, path.dirname(inputPath), `${baseName}${fileExt.replace('.', '_')}.pdf`);
+        fs.mkdirSync(path.dirname(outputPath), {recursive: true});
+        fs.writeFileSync(outputPath, pdfData);
+        fileCount++;
     }
     await browser.close();
-    console.log('\n> PDF created: ./output/...\n');
+    console.log(`  Total: ${fileCount} file(s)`);
+    console.log(`\n> PDF created: ${outputDir}...\n`);
 }
 
-async function createMergedPDF(inputFilePaths, options) {
+async function createMergedPDF(inputFilePaths, outputDir, options) {
     const browser = await puppeteer.launch();
     const mergedPDF = await PDFDocument.create();
+    let fileCount = 0;
 
+    console.log(`\n> Converting:`);
     for (const inputPath of inputFilePaths) {
-        console.log(`> Converting: ${inputPath}`);
+        console.log(`  ˙ ${inputPath}`);
         const pdfData = await createPDF(browser, inputPath, options);
         const pdfDocument = await PDFDocument.load(pdfData);
         const pagesToAdd = await mergedPDF.copyPages(pdfDocument, pdfDocument.getPageIndices());
         pagesToAdd.forEach((page) => {
             mergedPDF.addPage(page)
         });
+        fileCount++;
     }
     await browser.close();
+    console.log(`  Total: ${fileCount} file(s)`);
 
     if (options.footerPage !== false) {
         await addPageNumbers(mergedPDF);
     }
 
     const mergedPDFData = await mergedPDF.save();
-    fs.writeFileSync('./output/merged.pdf', mergedPDFData);
-    console.log('\n> PDF created: ./output/merged.pdf\n');
+    fs.mkdirSync(outputDir, {recursive: true});
+    fs.writeFileSync(`${outputDir}/merged.pdf`, mergedPDFData);
+    console.log(`\n> PDF created: ${outputDir}/merged.pdf\n`);
 }
 
-export { createIndividualPDFs, createMergedPDF };
+/**
+ * File handling
+ */
+
+// To skip non-text files (images, etc.)
+function isTextFile(targetPath, sampleSize = 8000) {
+    const fileDescriptor = fs.openSync(targetPath, 'r');
+    try {
+        const buffer = Buffer.alloc(sampleSize);
+        const bytesRead = fs.readSync(fileDescriptor, buffer, 0, buffer.length, 0);
+
+        for (let i = 0; i < bytesRead; i++) {
+            if (buffer[i] === 0) return false;
+        }
+        return true;
+    } finally {
+        fs.closeSync(fileDescriptor);
+    }
+}
+
+// Separates files into text or unreadable(binary)
+function findFiles(targetPath) {
+    const stat = fs.statSync(targetPath);
+    
+    if (stat.isFile()) {
+        return isTextFile(targetPath) ? {included: [targetPath], skipped: []} : {included: [], skipped: [targetPath]};
+    }
+
+    if (stat.isDirectory()) {
+        const included = [];
+        const skipped = [];
+        const entries = fs.readdirSync(targetPath, {withFileTypes: true});
+
+        for (const entry of entries) {
+            const fullPath = path.join(targetPath, entry.name);
+
+            if (entry.isDirectory()) {
+                const result = findFiles(fullPath);
+                included = included.concat(result.included);
+                skipped = skipped.concat(result.skipped);
+            } else if (isTextFile(fullPath)){
+                included.push(fullPath);
+            } else {
+                skipped.push(fullPath);
+            }
+        }
+        return {included, skipped};
+    }
+    return {included: [], skipped: []};
+}
+
+export { createIndividualPDFs, createMergedPDF, findFiles };

@@ -200,8 +200,8 @@ function findFiles(targetPath) {
     }
 
     if (stat.isDirectory()) {
-        const included = [];
-        const skipped = [];
+        let included = [];
+        let skipped = [];
         const entries = fs.readdirSync(targetPath, {withFileTypes: true});
 
         for (const entry of entries) {

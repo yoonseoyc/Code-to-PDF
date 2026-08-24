@@ -139,7 +139,7 @@ async function createIndividualPDFs(inputFilePaths, outputDir, options) {
     }
     await browser.close();
     console.log(`  Total: ${fileCount} file(s)`);
-    console.log(`\n> PDF created: ${outputDir}...\n`);
+    console.log(`\n> PDF created: ${outputDir}/...\n`);
 }
 
 async function createMergedPDF(inputFilePaths, outputDir, options) {

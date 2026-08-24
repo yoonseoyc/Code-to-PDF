@@ -8,6 +8,7 @@ import { createIndividualPDFs, createMergedPDF, findFiles } from '../src/index.j
 
 program
     .name('codepdf')
+    .usage('<paths...> [options]')
     .description('Convert code files to a highlighted PDF')
     .argument('<paths...>', 'File or folder paths to convert')
     .optionsGroup('Output:')
@@ -21,15 +22,15 @@ program
     .option('--line-numbers', 'Show line numbers')
     .option('--no-line-numbers', 'Hide line numbers')
     .optionsGroup('Header:')
-    .option('--header-path', 'Header left: show file path')
-    .option('--no-header-path', 'Header left: hide file path')
-    .option('--header-lang', 'Header right: show language')
-    .option('--no-header-lang', 'Header right: hide language')
+    .option('--header-path', 'Left header: show file path')
+    .option('--no-header-path', 'Left header: hide file path')
+    .option('--header-lang', 'Right header: show language')
+    .option('--no-header-lang', 'Right header: hide language')
     .optionsGroup('Footer:')
-    .option('--footer-name', 'Footer left: show file name')
-    .option('--no-footer-name', 'Footer left: hide file name')
-    .option('--footer-page', 'Footer right: show page number')
-    .option('--no-footer-page', 'Footer right: hide page number')
+    .option('--footer-name', 'Left footer: show file name')
+    .option('--no-footer-name', 'Left footer: hide file name')
+    .option('--footer-page', 'Right footer: show page number')
+    .option('--no-footer-page', 'Right footer: hide page number')
     .addHelpText('after',
         `
 Examples:
@@ -39,7 +40,7 @@ Examples:
         `
     )
     .showHelpAfterError(
-        `\nUsage: codepdf [options] <paths...>` +
+        `\nUsage: codepdf <paths...> [options]` +
         `\nHelp:  codepdf -h\n`
     )
     .action(async(paths, options) => {
@@ -115,10 +116,10 @@ Examples:
                 choices: [
                     {name: 'File title', value: 'fileTitle', checked: settings.fileTitle !== false},
                     {name: 'Line numbers', value: 'lineNumbers', checked: settings.lineNumbers !== false},
-                    {name: 'Header left: file path', value: 'headerPath', checked: settings.headerPath !== false},
-                    {name: 'Header right: language', value: 'headerLang', checked: settings.headerLang !== false},
-                    {name: 'Footer left: file name', value: 'footerName', checked: settings.footerName !== false},
-                    {name: 'Footer right: page number', value: 'footerPage', checked: settings.footerPage !== false}
+                    {name: 'Left header: file path', value: 'headerPath', checked: settings.headerPath !== false},
+                    {name: 'Right header: language', value: 'headerLang', checked: settings.headerLang !== false},
+                    {name: 'Left footer: file name', value: 'footerName', checked: settings.footerName !== false},
+                    {name: 'Right footer: page number', value: 'footerPage', checked: settings.footerPage !== false}
                 ]
             });
 
